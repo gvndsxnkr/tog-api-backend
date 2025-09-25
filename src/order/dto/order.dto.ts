@@ -52,6 +52,24 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Tax amount', example: 10.50 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  taxAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Shipping amount', example: 5.00 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  shippingAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Discount amount', example: 15.00 })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  discountAmount?: number;
 }
 
 export class UpdateOrderStatusDto {

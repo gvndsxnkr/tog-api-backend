@@ -19,8 +19,8 @@ export class CouponController {
   }
 
   @Post('apply')
-  async applyCoupon(@Body() body: { code: string; orderId: string }) {
-    return this.couponService.applyCoupon(body.code, body.orderId);
+  async applyCoupon(@Body() body: { code: string; orderId: string; userId: string }) {
+    return this.couponService.applyCoupon(body.code, body.orderId, body.userId);
   }
 
   @Get('user/:userId')

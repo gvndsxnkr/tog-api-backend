@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Coupon } from '../../database/models/coupon.model';
+import { CouponUsage } from '../../database/models/coupon-usage.model';
 import { CreateCouponDto } from './dto/coupon.dto';
 import { Op } from 'sequelize';
 
 @Injectable()
 export class CouponService {
-  constructor(@InjectModel(Coupon) private couponModel: typeof Coupon) {}
+  constructor(
+    @InjectModel(Coupon) private couponModel: typeof Coupon,
+    @InjectModel(CouponUsage) private couponUsageModel: typeof CouponUsage,
+  ) {}
 
   async create(createCouponDto: CreateCouponDto) {
     return this.couponModel.create(createCouponDto as any);
@@ -24,6 +28,16 @@ export class CouponService {
     });
 
     if (!coupon) return { valid: false, message: 'Invalid or expired coupon' };
+    
+    // Check per-user usage limit
+    const userUsageCount = await this.couponUsageModel.count({
+      where: { couponId: coupon.id, userId }
+    });
+    
+    if (coupon.userUsageLimit && userUsageCount >= coupon.userUsageLimit) {
+      return { valid: false, message: 'Coupon usage limit exceeded for this user' };
+    }
+
     if (coupon.minOrderAmount && orderAmount < coupon.minOrderAmount) {
       return { valid: false, message: `Minimum order amount is ${coupon.minOrderAmount}` };
     }
@@ -36,10 +50,18 @@ export class CouponService {
     return { valid: true, discount, discountType: coupon.type };
   }
 
-  async applyCoupon(code: string, orderId: string) {
+  async applyCoupon(code: string, orderId: string, userId: string) {
     const coupon = await this.couponModel.findOne({ where: { code } });
     if (coupon) {
       await coupon.increment('usedCount');
+      
+      // Track per-user usage
+      await this.couponUsageModel.create({
+        couponId: coupon.id,
+        userId,
+        orderId,
+      } as any);
+      
       return { applied: true, couponId: coupon.id };
     }
     return { applied: false };

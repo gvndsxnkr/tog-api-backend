@@ -8,6 +8,7 @@ import { Cart } from '../../database/models/cart.model';
 import { CartItem } from '../../database/models/cart-item.model';
 import { Product } from '../../database/models/product.model';
 import { User } from '../../database/models/user.model';
+import { Inventory } from '../../database/models/inventory.model';
 import {
   CreateCartDto,
   AddCartItemDto,
@@ -21,6 +22,7 @@ export class CartService {
     @InjectModel(CartItem) private cartItemModel: typeof CartItem,
     @InjectModel(Product) private productModel: typeof Product,
     @InjectModel(User) private userModel: typeof User,
+    @InjectModel(Inventory) private inventoryModel: typeof Inventory,
   ) {}
 
   async create(createCartDto: CreateCartDto): Promise<Cart> {
@@ -77,6 +79,19 @@ export class CartService {
     const product = await this.productModel.findByPk(addCartItemDto.productId);
     if (!product || !product.isActive) {
       throw new BadRequestException('Product not found or inactive');
+    }
+
+    // Check inventory if tracking is enabled
+    if (product.trackInventory) {
+      const inventory = await this.inventoryModel.findOne({
+        where: { productId: addCartItemDto.productId }
+      });
+      
+      if (!inventory || inventory.quantity < addCartItemDto.quantity) {
+        if (!product.allowBackorder) {
+          throw new BadRequestException(`Only ${inventory?.quantity || 0} items available in stock`);
+        }
+      }
     }
 
     // Check if item already exists in cart

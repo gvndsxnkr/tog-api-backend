@@ -8,6 +8,7 @@ import { OrderStatusHistory } from 'database/models/order-status-history.model';
 import { Product } from 'database/models/product.model';
 import { User } from 'database/models/user.model';
 import { Address } from 'database/models/address.model';
+import { Inventory } from 'database/models/inventory.model';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { Address } from 'database/models/address.model';
       Product,
       User,
       Address,
+      Inventory,
     ]),
   ],
   controllers: [OrderController],

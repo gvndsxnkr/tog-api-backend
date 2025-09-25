@@ -32,6 +32,9 @@ export class Coupon extends Model {
   @Column({ type: DataType.INTEGER, defaultValue: 1 })
   usageLimit: number;
 
+  @Column({ type: DataType.INTEGER, defaultValue: 1 })
+  userUsageLimit: number;
+
   @Column({ type: DataType.INTEGER, defaultValue: 0 })
   usedCount: number;
 

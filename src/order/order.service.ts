@@ -6,6 +6,7 @@ import { OrderStatusHistory } from '../../database/models/order-status-history.m
 import { Product } from '../../database/models/product.model';
 import { User } from '../../database/models/user.model';
 import { Address } from '../../database/models/address.model';
+import { Inventory } from '../../database/models/inventory.model';
 import { CreateOrderDto } from './dto/order.dto';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class OrderService {
     @InjectModel(Product) private productModel: typeof Product,
     @InjectModel(User) private userModel: typeof User,
     @InjectModel(Address) private addressModel: typeof Address,
+    @InjectModel(Inventory) private inventoryModel: typeof Inventory,
   ) {}
 
   async create(createOrderDto: CreateOrderDto) {
@@ -48,8 +50,28 @@ export class OrderService {
       if (!product || !product.isActive) {
         throw new BadRequestException(`Product ${item.productId} not found or inactive`);
       }
+
+      // Check inventory if tracking is enabled
+      if (product.trackInventory) {
+        const inventory = await this.inventoryModel.findOne({
+          where: { productId: item.productId }
+        });
+        
+        if (!inventory || inventory.quantity < item.quantity) {
+          if (!product.allowBackorder) {
+            throw new BadRequestException(`Insufficient stock for product ${product.name}`);
+          }
+        }
+      }
+
       calculatedSubtotal += parseFloat(product.price.toString()) * item.quantity;
     }
+
+    // Calculate total amount
+    const taxAmount = createOrderDto.taxAmount || 0;
+    const shippingAmount = createOrderDto.shippingAmount || 0;
+    const discountAmount = createOrderDto.discountAmount || 0;
+    const totalAmount = calculatedSubtotal + taxAmount + shippingAmount - discountAmount;
 
     // Create order
     const order = await this.orderModel.create({
@@ -57,9 +79,11 @@ export class OrderService {
       orderNumber: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
       status: 'pending',
       subtotal: calculatedSubtotal,
+      totalAmount,
+      paymentStatus: 'pending',
     } as any);
 
-    // Create order items
+    // Create order items and update inventory
     for (const item of createOrderDto.items) {
       const product = await this.productModel.findByPk(item.productId);
       await this.orderItemModel.create({
@@ -69,6 +93,14 @@ export class OrderService {
         unitPrice: product.price,
         totalPrice: parseFloat(product.price.toString()) * item.quantity,
       } as any);
+
+      // Update inventory
+      if (product.trackInventory) {
+        await this.inventoryModel.decrement('quantity', {
+          by: item.quantity,
+          where: { productId: item.productId }
+        });
+      }
     }
 
     // Create initial status history
